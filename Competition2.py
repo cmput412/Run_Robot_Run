@@ -157,7 +157,7 @@ class StopState(smach.State):
         return 'Done'
 
 
-class Turn90(smach.State):
+class Turn90Clockwise(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['Line','Done'])
         self.cmd_vel_pub = rospy.Publisher('/mobile_base/commands/velocity',
@@ -165,6 +165,11 @@ class Turn90(smach.State):
         self.button = rospy.Subscriber('/joy', Joy, self.button_callback)
         self.end = 0
         self.twist = Twist()
+        self.speed = 90
+        self.angle = 90
+        self.angular_speed = self.speed*2*math.pi/360
+        self.relative_angle = self.angle*3.3*math.pi/360
+
 
     def button_callback(self,msg):
         rospy.loginfo('in callback')
@@ -175,25 +180,108 @@ class Turn90(smach.State):
         rospy.loginfo('Executing Turn90 state')
         self.twist = Twist()
         while not rospy.is_shutdown():
-            while state_change_time > rospy.Time.now():
-                if self.end:
-                    return 'Done'
-                twist.linear.x = -0.1
-                self.cmd_vel_pub.publish(twist)
-            twist.linear.x = 0
-            self.cmd_vel_pub.publish(twist)
-            state_change_time = rospy.Time.now() + rospy.Duration(5)
-            twist = Twist()
-            while state_change_time > rospy.Time.now():
-                twist.angular.z = pi/7
-                self.cmd_vel_pub.publish(twist)
-                if self.stop:
-                    self.stop = 0
-                    return 'Sleep'
+            current_angle = 0
+            self.twist.angular.z = self.angular_speed
+            self.cmd_vel_pub.publish(self.twist)
+            t0 = rospy.Time.now().to_sec()
+            while(current_angle < self.relative_angle):
+                self.cmd_vel_pub.publish(self.twist)
+                t1 = rospy.Time.now().to_sec()
+                current_angle = self.angular_speed*(t1-t0)
+                rospy.loginfo(current_angle)
+            self.twist.angular.z = 0
+            self.cmd_vel_pub.publish(self.twist)
+            return 'Done'
 
-            twist = Twist()
-            self.cmd_vel_pub.publish(twist)
+            
 
+
+        return 'Done'
+
+
+class Turn90CounterClockwise(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['Line','Done'])
+        self.cmd_vel_pub = rospy.Publisher('/mobile_base/commands/velocity',
+                            Twist, queue_size=1)
+        self.button = rospy.Subscriber('/joy', Joy, self.button_callback)
+        self.end = 0
+        self.twist = Twist()
+        self.speed = -90
+        self.angle = 90
+        self.angular_speed = self.speed*2*math.pi/360
+        self.relative_angle = self.angle*3.3*math.pi/360
+
+
+    def button_callback(self,msg):
+        rospy.loginfo('in callback')
+        if msg.buttons[1] == 1:
+            self.end = 1
+
+    def execute(self,userdata):
+        rospy.loginfo('Executing Turn90 state')
+        self.twist = Twist()
+        while not rospy.is_shutdown():
+            current_angle = 0
+            self.twist.angular.z = self.angular_speed
+            self.cmd_vel_pub.publish(self.twist)
+            t0 = rospy.Time.now().to_sec()
+            while(current_angle < self.relative_angle):
+                self.cmd_vel_pub.publish(self.twist)
+                t1 = rospy.Time.now().to_sec()
+                current_angle = abs(self.angular_speed)*(t1-t0)
+                rospy.loginfo(current_angle)
+            self.twist.angular.z = 0
+            self.cmd_vel_pub.publish(self.twist)
+            return 'Done'
+
+            
+
+
+        return 'Done'
+
+
+
+class Turn180(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['Line','Done'])
+        self.cmd_vel_pub = rospy.Publisher('/mobile_base/commands/velocity',
+                            Twist, queue_size=1)
+        self.button = rospy.Subscriber('/joy', Joy, self.button_callback)
+        self.end = 0
+        self.twist = Twist()
+        self.speed = 90
+        self.angle = 180
+        self.angular_speed = self.speed*2*math.pi/360
+        self.relative_angle = self.angle*3*math.pi/360
+
+
+    def button_callback(self,msg):
+        rospy.loginfo('in callback')
+        if msg.buttons[1] == 1:
+            self.end = 1
+
+    def execute(self,userdata):
+        rospy.loginfo('Executing Turn90 state')
+        self.twist = Twist()
+        while not rospy.is_shutdown():
+            current_angle = 0
+            self.twist.angular.z = self.angular_speed
+            self.cmd_vel_pub.publish(self.twist)
+            t0 = rospy.Time.now().to_sec()
+            while(current_angle < self.relative_angle):
+                self.cmd_vel_pub.publish(self.twist)
+                t1 = rospy.Time.now().to_sec()
+                current_angle = self.angular_speed*(t1-t0)
+                rospy.loginfo(current_angle)
+            self.twist.angular.z = 0
+            self.cmd_vel_pub.publish(self.twist)
+            return 'Done'
+
+            
+
+
+        return 'Done'
     
 
 
@@ -206,8 +294,9 @@ class Turn90(smach.State):
 
 def main():
     rospy.init_node('Comp2')
+    rate = rospy.Rate(10)
     sm = smach.StateMachine(outcomes = ['DoneProgram'])
-    sm.set_initial_state(['LineFollow'])
+    sm.set_initial_state(['Turn180'])
 
     with sm:
         
@@ -221,6 +310,16 @@ def main():
                                                         'Done' : 'DoneProgram'})
 
         smach.StateMachine.add('StopState', StopState(),
+                                        transitions = {'Line': 'LineFollow',
+                                                        'Done' : 'DoneProgram'})
+        smach.StateMachine.add('Turn90Clockwise', Turn90Clockwise(),
+                                        transitions = {'Line': 'LineFollow',
+                                                        'Done' : 'DoneProgram'})
+        smach.StateMachine.add('Turn90CounterClockwise', Turn90CounterClockwise(),
+                                        transitions = {'Line': 'LineFollow',
+                                                        'Done' : 'DoneProgram'})
+
+        smach.StateMachine.add('Turn180', Turn180(),
                                         transitions = {'Line': 'LineFollow',
                                                         'Done' : 'DoneProgram'})
  
