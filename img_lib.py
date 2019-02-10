@@ -1,6 +1,7 @@
 import rospy, cv2, cv_bridge
 import argparse
 import imutils
+import numpy
 
 # code from https://www.pyimagesearch.com/2016/02/08/opencv-shape-detection/
 class ShapeDetector:
@@ -30,17 +31,34 @@ class ShapeDetector:
 def location1(img):
     """Counts number of red pillars and returns the number"""
 
-    lower_red = numpy.array([120,150,150])                          # set upper and lower range for red mask
-    upper_red = numpy.array([180,255,255])
-    redmask = cv2.inRange(image,lower_red,upper_red)
+    lower_red = numpy.array([100,0,0])                          # set upper and lower range for red mask
+    upper_red = numpy.array([255,30,30])
+    redmask = cv2.inRange(img,lower_red,upper_red)
+
+
+    
+    cv2.imshow("window2" , redmask)
+
 
     # Set up the detector with default parameters.
-    detector = cv2.SimpleBlobDetector()
-    
-    # Detect blobs.
-    keypoints = detector.detect(im)
+    gray = cv2.cvtColor(redmask, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    thresh = cv2.threshold(blurred, 60, 255, cv2.THRESH_BINARY)[1]
 
-    return len(keypoints)
+    cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = imutils.grab_contours(cnts)
+    sd = ShapeDetector()
+
+    # loop over the contours (in out case there should only be one)
+    for c in cnts:
+        # compute the center of the contour, then detect the name of the
+        # shape using only the contour
+        M = cv2.moments(c)
+        cX = int((M["m10"] / M["m00"]) * ratio)
+        cY = int((M["m01"] / M["m00"]) * ratio)
+        shape = sd.detect(c)
+    
+    return len(cnts)
 
 def location2(img):
     """Counts number of shapes and returns which shape is green"""
@@ -48,13 +66,14 @@ def location2(img):
     #First, count the number of shapes
     lower_red = numpy.array([120,150,150])                          # set upper and lower range for red mask
     upper_red = numpy.array([180,255,255])
-    redmask = cv2.inRange(image,lower_red,upper_red)
+    redmask = cv2.inRange(img,lower_red,upper_red)
 
     # Set up the detector with default parameters.
     detector = cv2.SimpleBlobDetector()
     
-    # Detect blobs.
-    keypoints = detector.detect(im)
+    # Detect blobs. Fi==
+    #TODO fix
+    keypoints = detector.detect(img)
     num_red = len(keypoints)
 
     num_shape = num_red + 1
@@ -62,9 +81,9 @@ def location2(img):
     #Now, determine which shape is green
     lower_green = numpy.array([15,120,90])                          # set upper and lower range for red mask
     upper_red = numpy.array([80,255,165])
-    greenmask = cv2.inRange(image,lower_green,upper_green)
+    greenmask = cv2.inRange(img,lower_green,upper_green)
 
-    gray = cv2.cvtColor(greenmask, cv2.COLOR2GRAY)
+    gray = cv2.cvtColor(greenmask, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     thresh = cv2.threshold(blurred, 60, 255, cv2.THRESH_BINARY)[1]
 
@@ -88,9 +107,9 @@ def location3(img, shape):
     #First, count the number of shapes
     lower_red = numpy.array([120,150,150])                          # set upper and lower range for red mask
     upper_red = numpy.array([180,255,255])
-    redmask = cv2.inRange(image,lower_red,upper_red)
+    redmask = cv2.inRange(img,lower_red,upper_red)
 
-    gray = cv2.cvtColor(redmask, cv2.COLOR2GRAY)
+    gray = cv2.cvtColor(redmask, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     thresh = cv2.threshold(blurred, 60, 255, cv2.THRESH_BINARY)[1]
 
