@@ -37,7 +37,7 @@ def location1(img):
 
 
     
-    cv2.imshow("window2" , redmask)
+    #cv2.imshow("window2" , redmask)
 
 
     # Set up the detector with default parameters.
