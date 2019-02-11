@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import rospy, cv2, cv_bridge, numpy, smach, smach_ros, time, math, img_lib
+import rospy, cv2, cv_bridge, numpy, smach, smach_ros, time, math#, img_lib
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan, Joy, Image
 from nav_msgs.msg import Odometry
@@ -37,8 +37,10 @@ class SleepState(smach.State):
 
 class LineFollow(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['Turn180', 'TurnCounter','TurnClock','Stop','Done'])
+        smach.State.__init__(self, outcomes=['Scan', 'TurnCounter','TurnClock','Stop','Done'])
         self.bridge = cv_bridge.CvBridge()
+        self.led1 = rospy.Publisher('/mobile_base/commands/led1', Led, queue_size = 1 )
+        self.led2 = rospy.Publisher('/mobile_base/commands/led2', Led, queue_size = 1 )
         self.image_sub = rospy.Subscriber('/camera/rgb/image_raw',   
                         Image,self.image_callback)
         self.cmd_vel_pub = rospy.Publisher('/mobile_base/commands/velocity',
@@ -52,40 +54,42 @@ class LineFollow(smach.State):
         self.RM = None
         self.image = None
         self.noLine = 0
+        self.t1 = None
 
     def execute(self, userdata):
         global counter
         rospy.loginfo('Executing Line Follow state')
         self.stop = 0 
         self.twist = Twist()
-        self.NoLine = 0
+        self.noLine = 0
+        self.t1 = None
+        self.led1.publish(1)
+        self.led2.publish(1)
         while not rospy.is_shutdown():
             if self.end:
                 return 'Done'
             elif self.stop:
-                rospy.sleep(1)
-                self.twist = Twist()
-                self.cmd_vel_pub.publish(self.twist)
                 if counter == 0 or counter == 2 or counter == 4 or counter == 7 or counter == 8 or counter == 9:
                     counter += 1
+                    self.twist.linear.x = 0.3
+                    self.cmd_vel_pub.publish(self.twist)
+                    rospy.sleep(1.5)
                     return 'TurnCounter'
                 elif counter == 1 or counter == 5 or counter == 6:
                     counter += 1
+                    rospy.sleep(0.5)
+                    self.twist = Twist()
+                    self.cmd_vel_pub.publish(self.twist)
                     return 'Stop'
-                elif counter == 3:
-                    counter += 1
-                    return 'Turn180'
                 elif counter == 10:
                     counter = 0
-                    return 'Done'
-            #elif self.noLine:
-                #counter += 1
-                #return 'Turn180'
-
-
-
-
-                return 'Stop'
+                    rospy.sleep(1)
+                    self.twist = Twist()
+                    self.cmd_vel_pub.publish(self.twist)
+                    return 'Stop'
+            elif self.noLine == 2:
+                counter += 1
+                return 'Scan'
         return 'Done'
 
     def button_callback(self,msg):
@@ -94,6 +98,7 @@ class LineFollow(smach.State):
             self.end = 1
 
     def image_callback(self, msg):
+        global counter
         self.image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
         hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
 
@@ -119,20 +124,33 @@ class LineFollow(smach.State):
         self.M = cv2.moments(whitemask)
         self.RM = cv2.moments(redmask)
 
-        if self.M['m00'] > 0:
+        if self.RM['m00'] > 0:
+            self.noLine = 0
+            self.stop = 1
+            self.twist.linear.x = 0.3
+            self.cmd_vel_pub.publish(self.twist)
+
+        elif self.M['m00'] > 0 and self.stop == 0:
+            self.noLine = 0
             self.PID_Controller(w)
 
-        if self.RM['m00'] > 0:
-            self.stop = 1
+        else:
+            if self.noLine == 0:
+                self.t1 = rospy.Time.now() + rospy.Duration(2)
+                self.noLine = 1
+            elif self.noLine == 1 and (self.t1 <= rospy.Time.now()):
+                self.noLine = 2
 
-        #else:
-            #self.noLine = 1
+
+
+
 
 
         cv2.imshow("window", self.image)
         cv2.waitKey(3)
 
     def PID_Controller(self,w):
+
         prev_err = 0
         integral = 0
         dt = 1
@@ -197,7 +215,7 @@ class Turn90Clockwise(smach.State):
         self.speed = -45
         self.angle = 90
         self.angular_speed = self.speed*2*math.pi/360
-        self.relative_angle = self.angle*3*math.pi/360
+        self.relative_angle = self.angle*2*math.pi/360
 
 
     def button_callback(self,msg):
@@ -207,7 +225,21 @@ class Turn90Clockwise(smach.State):
 
     def execute(self,userdata):
         rospy.loginfo('Executing Turn90Clockwise state')
+
+        global counter
+        rospy.loginfo('Executing Turn90 state')
         self.twist = Twist()
+        while not rospy.is_shutdown():
+            current_angle = 0
+            self.twist.angular.z = self.angular_speed
+            self.cmd_vel_pub.publish(self.twist)
+            t0 = rospy.Time.now().to_sec()
+            while(current_angle < self.relative_angle):
+                self.cmd_vel_pub.publish(self.twist)
+                t1 = rospy.Time.now().to_sec()
+                current_angle = abs(self.angular_speed)*(t1-t0)
+            return 'Line'
+        '''self.twist = Twist()
         time = rospy.Time.now() + rospy.Duration(5)
         while not rospy.is_shutdown():
 
@@ -217,8 +249,8 @@ class Turn90Clockwise(smach.State):
 
             self.twist = Twist()
             self.cmd_vel_pub.publish(self.twist)
-            return 'Line'
-            '''current_angle = 0
+            #return 'Line'
+            current_angle = 0
             self.twist.angular.z = self.angular_speed
             self.cmd_vel_pub.publish(self.twist)
             t0 = rospy.Time.now().to_sec()
@@ -240,7 +272,7 @@ class Turn90Clockwise(smach.State):
 
 class Turn90CounterClockwise(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['TurnClock', 'Line','Done'])
+        smach.State.__init__(self, outcomes=['Scan', 'Line','Done'])
         self.cmd_vel_pub = rospy.Publisher('/mobile_base/commands/velocity',
                             Twist, queue_size=1)
         self.button = rospy.Subscriber('/joy', Joy, self.button_callback)
@@ -249,7 +281,7 @@ class Turn90CounterClockwise(smach.State):
         self.speed = 45
         self.angle = 90
         self.angular_speed = self.speed*2*math.pi/360
-        self.relative_angle = self.angle*3*math.pi/360
+        self.relative_angle = self.angle*2*math.pi/360
 
 
     def button_callback(self,msg):
@@ -270,10 +302,9 @@ class Turn90CounterClockwise(smach.State):
                 self.cmd_vel_pub.publish(self.twist)
                 t1 = rospy.Time.now().to_sec()
                 current_angle = abs(self.angular_speed)*(t1-t0)
-                rospy.loginfo(current_angle)
 
             if counter == 1 or counter == 8 or counter == 9 or counter == 10:
-                return 'TurnClock' 
+                return 'Scan' 
 
             elif counter == 3 or counter == 5:
                 return 'Line'
@@ -294,7 +325,7 @@ class Turn180(smach.State):
         self.speed = 90
         self.angle = 180
         self.angular_speed = self.speed*2*math.pi/360
-        self.relative_angle = self.angle*3*math.pi/360
+        self.relative_angle = self.angle*2.6*math.pi/360
 
 
     def button_callback(self,msg):
@@ -316,7 +347,7 @@ class Turn180(smach.State):
                 current_angle = self.angular_speed*(t1-t0)
             self.twist.angular.z = 0
             self.cmd_vel_pub.publish(self.twist)
-            return 'Done'
+            return 'Line'
 
             
 
@@ -325,6 +356,38 @@ class Turn180(smach.State):
 
 
 
+
+class ScanObject(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['Turn180', 'TurnClock','Done'])
+        self.cmd_vel_pub = rospy.Publisher('/mobile_base/commands/velocity',
+                            Twist, queue_size=1)
+        self.led1 = rospy.Publisher('/mobile_base/commands/led1', Led, queue_size = 1 )
+        self.led2 = rospy.Publisher('/mobile_base/commands/led2', Led, queue_size = 1 )
+        self.button = rospy.Subscriber('/joy', Joy, self.button_callback)
+
+
+    def button_callback(self,msg):
+        rospy.loginfo('in callback')
+        if msg.buttons[1] == 1:
+            self.end = 1
+
+    def execute(self,userdata):
+        rospy.loginfo('Executing Turn90 state')
+        self.twist = Twist()
+        while not rospy.is_shutdown():
+            self.led1.publish(3)
+            self.led2.publish(3)
+            rospy.sleep(2)
+            if counter == 4:
+                return 'Turn180'
+            else:
+                return 'TurnClock'
+
+        return 'Done'
+
+
+'''
 class Test(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['Done'])
@@ -384,7 +447,7 @@ class Test(smach.State):
         output = (err * Kp) + (integral * Ki) + (derivative * Kd)
         self.twist.linear.x = 0.3
         self.twist.angular.z =  -output
-        self.cmd_vel_pub.publish(self.twist)
+        self.cmd_vel_pub.publish(self.twist)'''
 
     
 
@@ -400,7 +463,7 @@ def main():
     rospy.init_node('Comp2')
     rate = rospy.Rate(10)
     sm = smach.StateMachine(outcomes = ['DoneProgram'])
-    sm.set_initial_state(['Test'])
+    sm.set_initial_state(['LineFollow'])
 
     with sm:
         
@@ -410,7 +473,7 @@ def main():
                                                         'Done' : 'DoneProgram'})
 
         smach.StateMachine.add('LineFollow', LineFollow(),
-                                        transitions = { 'Turn180': 'Turn180',
+                                        transitions = { 'Scan': 'ScanObject',
                                                         'TurnCounter': 'Turn90CounterClockwise',
                                                         'TurnClock': 'Turn90Clockwise',
                                                         'Stop': 'StopState',
@@ -425,15 +488,20 @@ def main():
                                                         'Done' : 'DoneProgram'})
 
         smach.StateMachine.add('Turn90CounterClockwise', Turn90CounterClockwise(),
-                                        transitions = { 'TurnClock': 'Turn90Clockwise',
+                                        transitions = { 'Scan': 'ScanObject',
                                                         'Line': 'LineFollow',
                                                         'Done' : 'DoneProgram'})
 
         smach.StateMachine.add('Turn180', Turn180(),
                                         transitions = {'Line': 'LineFollow',
                                                         'Done' : 'DoneProgram'})
-        smach.StateMachine.add('Test', Test(),
-                                        transitions = {'Done' : 'DoneProgram'})
+        #smach.StateMachine.add('Test', Test(),
+        #                                transitions = {'Done' : 'DoneProgram'})
+
+        smach.StateMachine.add('ScanObject', ScanObject(),
+                                        transitions = { 'Turn180': 'Turn180',
+                                                        'TurnClock': 'Turn90Clockwise',
+                                                        'Done' : 'DoneProgram'})
  
  
     sis = smach_ros.IntrospectionServer('server_name', sm, '/SM_ROOT')
