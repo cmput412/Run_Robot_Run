@@ -71,17 +71,23 @@ class Count(smach.State):
         #redmask = self.threshold_hsv_360(30,80,20,255,255,120,hsv)  #ORIGINAL RED
         #redmask = self.threshold_hsv_360(80,100,10,255,255,120,hsv)    # really good for red
         #redmask = self.threshold_hsv_360(140,100,10,255,255,120,hsv)    # ignores green, really good for red
-        lower_red = numpy.array([40,50,50])#[100,0,0])                   
+    	lower_red = numpy.array([40,50,50])#[100,0,0])                   
     	upper_red = numpy.array([70,255,255])#[255,30,30])
     	redmask = cv2.inRange(hsv,lower_red,upper_red) # green masks
         #cv2.inRange(hsv,lower_red,upper_red)
     	#rospy.loginfo(redmask)
     	ret, thresh = cv2.threshold(redmask, 127, 255, 0)
     	im2, cnts, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    	cv2.drawContours(redmask, cnts, -1, (0,255,0), 3)
-
+		cv2.drawContours(redmask, cnts, -1, (0,255,0), 3)
+		cnts = imutils.grab_contours(cnts)
     	sd = ShapeDetector()
-    	shape = sd.detect(cnts)
+
+		shape = None
+		for c in cnts:
+
+			shape = sd.detect(c)
+ 
+    	#shape = sd.detect(cnts)
     	rospy.loginfo(shape)
     	#redmask2 = redmask + 1
     	#img = numpy.zeros((480,640))
