@@ -226,6 +226,7 @@ class Turn90Clockwise(smach.State):
         self.angular_speed = self.speed*2*math.pi/360
         self.relative_angle = self.angle*2.3*math.pi/360
         self.mult = 1.2
+        self.nult2 = 0.8
 
     def button_callback(self,msg):
         rospy.loginfo('in callback')
@@ -240,6 +241,8 @@ class Turn90Clockwise(smach.State):
         self.relative_angle = self.angle*2.3*math.pi/360
         if counter == 9:
             self.relative_angle = self.relative_angle * self.mult
+        if counter == 8:
+            self.relative_angle = self.relative_angle * self.mult2
         self.twist = Twist()
         while not rospy.is_shutdown():
             current_angle = 0
@@ -295,6 +298,7 @@ class Turn90CounterClockwise(smach.State):
         self.angular_speed = self.speed*2*math.pi/360
         self.relative_angle = self.angle*2.3*math.pi/360
         self.mult = 1.2
+        self.mult2 = 0.8
 
 
     def button_callback(self,msg):
@@ -308,6 +312,8 @@ class Turn90CounterClockwise(smach.State):
         self.relative_angle = self.angle*2.3*math.pi/360
         if counter == 9:
             self.relative_angle = self.relative_angle * self.mult
+        if counter == 8:
+            self.relative_angle = self.relative_angle * self.mult2
 
 
         rospy.loginfo('Executing Turn90 state')
