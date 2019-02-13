@@ -69,22 +69,21 @@ class Count(smach.State):
 
         # try h max at 10 to remove green
         #redmask = self.threshold_hsv_360(30,80,20,255,255,120,hsv)  #ORIGINAL RED
-        #redmask = self.threshold_hsv_360(80,100,10,255,255,120,hsv)    # really good for red
+        #redmask = self.threshold_hsv_360(80,10,10,255,255,120,hsv)    # really good for red
         #redmask = self.threshold_hsv_360(140,100,10,255,255,120,hsv)    # ignores green, really good for red
-    	lower_red = numpy.array([40,50,50])#[100,0,0])                   
-    	upper_red = numpy.array([70,255,255])#[255,30,30])
-    	redmask = cv2.inRange(hsv,lower_red,upper_red) # green masks
+    	#lower_red = numpy.array([40,50,50])#[100,0,0])                   
+    	#upper_red = numpy.array([70,255,255])#[255,30,30])
+    	#redmask = cv2.inRange(hsv,lower_red,upper_red) # green masks
+    	redmask = self.threshold_hsv_360(140,10,10,255,255,120,hsv)
         #cv2.inRange(hsv,lower_red,upper_red)
     	#rospy.loginfo(redmask)
     	ret, thresh = cv2.threshold(redmask, 127, 255, 0)
-    	im2, cnts, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-		cv2.drawContours(redmask, cnts, -1, (0,255,0), 3)
-		cnts = imutils.grab_contours(cnts)
+    	im2, cnts, hierarchy = cv2.findContours(thresh,cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    	cv2.drawContours(redmask, cnts, -1, (0,255,0), 3)
+    	#cnts = imutils.grab_contours(cnts)
     	sd = ShapeDetector()
-
-		shape = None
-		for c in cnts:
-
+    	shape = None
+    	for c in cnts:
 			shape = sd.detect(c)
  
     	#shape = sd.detect(cnts)
@@ -94,19 +93,19 @@ class Count(smach.State):
     	#if self.first:
     	#	rospy.loginfo(redmask)
     	#for i in range(480):
-    	img = measure.label(redmask, background=0)
+    	#img = measure.label(redmask, background=0)
     	#if self.first:
     	#	rospy.loginfo(2)
     	#	rospy.loginfo(img)
     	#	self.first = 0
-    	img += 1
-    	propsa = measure.regionprops(img.astype(int))
-    	length = len(propsa)
-    	self.lst.append(length-1)
+    	#img += 1
+    	#propsa = measure.regionprops(img.astype(int))
+    	#length = len(propsa)
+    	#self.lst.append(length-1)
 
-    	if len(self.lst) > 40:
-    		self.val = self.lst[-1]
-    		self.found = 1
+    	#if len(self.lst) > 40:
+    	#	self.val = self.lst[-1]
+    		#self.found = 1
     	#rospy.loginfo(self.avg)
     	#imgray = cv2.cvtColor(redmask, cv2.COLOR_BGR2GRAY)
     	#rospy.loginfo(imgray)
@@ -115,7 +114,7 @@ class Count(smach.State):
 
     	#rospy.loginfo(redmask[0])
     	#rospy.loginfo(redmask[0])
-        #hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
+        #hsv = cv2.cvtColor(selfredmask.image, cv2.COLOR_BGR2HSV)
         cv2.imshow("window", redmask)
         cv2.waitKey(3)
 
