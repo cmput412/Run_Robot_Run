@@ -67,7 +67,7 @@ class LineFollow(smach.State):
         self.noLine = 0
         self.t1 = None
         self.led1.publish(0)
-        self.led2.publish(0)
+        self.led2.publish()
         while not rospy.is_shutdown():
             if self.end:
                 return 'Done'
@@ -76,6 +76,7 @@ class LineFollow(smach.State):
                     counter += 1
                     self.twist.linear.x = 0.3
                     self.cmd_vel_pub.publish(self.twist)
+                    rospy.sleep(2.5)
                     return 'TurnCounter'
                 elif counter == 1 or counter == 5 or counter == 6:
                     counter += 1
@@ -85,7 +86,7 @@ class LineFollow(smach.State):
                     return 'Stop'
                 elif counter == 10:
                     counter = 0
-                    rospy.sleep(1)
+                    rospy.sleep(1.5)
                     self.twist = Twist()
                     self.cmd_vel_pub.publish(self.twist)
                     return 'Stop'
@@ -161,9 +162,9 @@ class LineFollow(smach.State):
         cy = int(self.M['m01']/self.M['m00'])
         cv2.circle(self.image, (cx, cy), 20, (0,0,255),-1)
         err = cx - w/2
-        Kp = .0035 
+        Kp = .006
         Ki = 0
-        Kd = .001
+        Kd = .002
         integral = integral + err * dt
         derivative = (err-prev_err) / dt
         prev_err = err
@@ -201,7 +202,7 @@ class StopState(smach.State):
                     return 'Done'
             self.twist.linear.x = 0.3
             self.cmd_vel_pub.publish(self.twist)
-            rospy.sleep(.5)
+            rospy.sleep(1)
             return 'Line'
         return 'Done'
 
@@ -217,7 +218,7 @@ class Turn90Clockwise(smach.State):
         self.speed = -45
         self.angle = 90
         self.angular_speed = self.speed*2*math.pi/360
-        self.relative_angle = self.angle*2.3*math.pi/360
+        self.relative_angle = self.angle*2*math.pi/360
 
 
     def button_callback(self,msg):
@@ -274,7 +275,7 @@ class Turn90Clockwise(smach.State):
 
 class Turn90CounterClockwise(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['Read', 'Scan', 'Line','Done'])
+        smach.State.__init__(self, outcomes=['Scan', 'Line','Done'])
         self.cmd_vel_pub = rospy.Publisher('/mobile_base/commands/velocity',
                             Twist, queue_size=1)
         self.button = rospy.Subscriber('/joy', Joy, self.button_callback)
@@ -283,7 +284,7 @@ class Turn90CounterClockwise(smach.State):
         self.speed = 45
         self.angle = 90
         self.angular_speed = self.speed*2*math.pi/360
-        self.relative_angle = self.angle*2.3*math.pi/360
+        self.relative_angle = self.angle*2*math.pi/360
 
 
     def button_callback(self,msg):
@@ -295,14 +296,6 @@ class Turn90CounterClockwise(smach.State):
         global counter
         rospy.loginfo('Executing Turn90 state')
         self.twist = Twist()
-        self.twist.linear.x =.3
-        if counter == 9:
-            self.twist.angular.z = 0.5
-        self.cmd_vel_pub.publish(self.twist)
-        t0 = rospy.Time.now() + rospy.Duration(3)
-        while t0 > rospy.Time.now():
-            x = 0
-        self.twist = Twist()
         while not rospy.is_shutdown():
             current_angle = 0
             self.twist.angular.z = self.angular_speed
@@ -312,11 +305,9 @@ class Turn90CounterClockwise(smach.State):
                 self.cmd_vel_pub.publish(self.twist)
                 t1 = rospy.Time.now().to_sec()
                 current_angle = abs(self.angular_speed)*(t1-t0)
-            rospy.loginfo(counter)
-            if counter == 1:
+
+            if counter == 1 or counter == 8 or counter == 9 or counter == 10:
                 return 'Scan' 
-            elif counter == 8 or counter == 9 or counter == 10:
-                return 'Read'
 
             elif counter == 3 or counter == 5:
                 return 'Line'
@@ -371,20 +362,12 @@ class Turn180(smach.State):
 
 class ScanObject(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['Read', 'TurnClock','Done'])
-        
+        smach.State.__init__(self, outcomes=['Turn180', 'TurnClock','Done'])
         self.cmd_vel_pub = rospy.Publisher('/mobile_base/commands/velocity',
                             Twist, queue_size=1)
-        self.image_sub = rospy.Subscriber('/camera/rgb/image_raw',   
-                        Image,self.image_callback)
         self.led1 = rospy.Publisher('/mobile_base/commands/led1', Led, queue_size = 1 )
         self.led2 = rospy.Publisher('/mobile_base/commands/led2', Led, queue_size = 1 )
         self.button = rospy.Subscriber('/joy', Joy, self.button_callback)
-        self.bridge = cv_bridge.CvBridge()
-        self.val = None
-        self.found = 0
-        self.lst = []
-        self.scanTime = 0
 
 
     def button_callback(self,msg):
@@ -393,126 +376,81 @@ class ScanObject(smach.State):
             self.end = 1
 
     def execute(self,userdata):
-        self.scanTime = 1
-        self.lst = []
-        self.found = 0
-        global counter
+        rospy.loginfo('Executing Turn90 state')
         self.twist = Twist()
-        self.cmd_vel_pub.publish(self.twist)
         while not rospy.is_shutdown():
-            if self.found:
-                if counter == 4:
-                    self.val += 1
-                if self.val == 1:
-                    rospy.loginfo('here1')
-                    self.led1.publish(1)
-                elif self.val == 2:
-                    rospy.loginfo('here2')
-                    self.led2.publish(1)
-                else:
-                    rospy.loginfo('here3')
-                    self.led1.publish(1)
-                    self.led2.publish(1)
-                self.scanTime = 0                
-                if counter == 4:
-                    return 'Read'
+            self.led1.publish(3)
+            self.led2.publish(3)
+            rospy.sleep(2)
+            if counter == 4:
+                return 'Turn180'
+            else:
                 return 'TurnClock'
 
         return 'Done'
 
-    def image_callback(self, msg):
-        if self.scanTime:
-            global counter
-            self.image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
-            hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
-            if counter == 4:
-                redmask = self.threshold_hsv_360(140,100,10,255,255,120,hsv)    # ignores green, really good for red
-            else:
-                redmask = self.threshold_hsv_360(30,80,20,255,255,120,hsv)
-            ret, thresh = cv2.threshold(redmask, 127, 255, 0)
-            im2, cnts, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            cv2.drawContours(redmask, cnts, -1, (0,255,0), 3)
 
-            img = measure.label(redmask, background=0)
-            img += 1
-            propsa = measure.regionprops(img.astype(int))
-            length = len(propsa)
-
-            self.lst.append(length-1)
-
-            if len(self.lst) > 40:
-                self.val = self.lst[-1]
-                self.found = 1
-
-        #self.grouping += length - 1
-        #self.i += 1
-        #self.avg = self.grouping/self.i
-        #cv2.imshow("window", redmask)
-        #cv2.waitKey(3)
-        
-
-    def threshold_hsv_360(self,s_min, v_min, h_max, s_max, v_max, h_min, hsv):
-        lower_color_range_0 = numpy.array([0, s_min, v_min],dtype=float)
-        upper_color_range_0 = numpy.array([h_max/2., s_max, v_max],dtype=float)
-        lower_color_range_360 = numpy.array([h_min/2., s_min, v_min],dtype=float)
-        upper_color_range_360 = numpy.array([360/2., s_max, v_max],dtype=float)
-        mask0 = cv2.inRange(hsv, lower_color_range_0, upper_color_range_0)
-        mask360 = cv2.inRange(hsv, lower_color_range_360, upper_color_range_360)
-        mask = mask0 | mask360
-        return mask
-
-
-
-
-class ReadShape(smach.State):
+'''
+class Test(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['Turn180', 'TurnClock','Done'])
-        self.cmd_vel_pub = rospy.Publisher('/mobile_base/commands/velocity',
-                            Twist, queue_size=1)
+        smach.State.__init__(self, outcomes=['Done'])
+        self.bridge = cv_bridge.CvBridge()
         self.image_sub = rospy.Subscriber('/camera/rgb/image_raw',   
                         Image,self.image_callback)
-        self.led1 = rospy.Publisher('/mobile_base/commands/led1', Led, queue_size = 1 )
-        self.led2 = rospy.Publisher('/mobile_base/commands/led2', Led, queue_size = 1 )
+        self.cmd_vel_pub = rospy.Publisher('/mobile_base/commands/velocity',
+                            Twist, queue_size=1)
         self.button = rospy.Subscriber('/joy', Joy, self.button_callback)
-        self.bridge = cv_bridge.CvBridge()
-        self.readTime = 0
+        self.twist= Twist()
+        self.rate = rospy.Rate(10)
+        self.end = 0 
+        self.stop = 0
+        self.M = None
+        self.RM = None
+        self.image = None
+        self.noLine = 0
 
+    def execute(self, userdata):
+        global counter
+        rospy.loginfo('Executing Line Follow state')
+        self.stop = 0 
+        self.twist = Twist()
+        self.NoLine = 0
+        while not rospy.is_shutdown():
+            if self.stop:
+                return 'Done'
+
+        return 'Done'
 
     def button_callback(self,msg):
         rospy.loginfo('in callback')
         if msg.buttons[1] == 1:
             self.end = 1
 
-    def execute(self,userdata):
-        global counter
-        self.readTime = 1
-        self.lst = []
-        self.twist = Twist()
-        self.cmd_vel_pub.publish(self.twist)
-        while not rospy.is_shutdown():
-            rospy.sleep(2)
-            if counter == 4:
-                return 'Turn180'
-            return 'TurnClock'
-
-        return 'Done'
-
     def image_callback(self, msg):
-        pass
-        '''if self.readTime:
-            global counter
-            self.image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
-            hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
-            if counter == 4:
-                mask = self.threshold_hsv_360(140,100,10,255,255,120,hsv)    # ignores green, really good for red
-            else:
-                lower_red = numpy.array([40,50,50])#[100,0,0])                   
-                upper_red = numpy.array([70,255,255])#[255,30,30])
-                mask = cv2.inRange(hsv,lower_red,upper_red) # green masks
-            ret, thresh = cv2.threshold(mask, 127, 255, 0)
-            im2, cnts, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            cv2.drawContours(mask, cnts, -1, (0,255,0), 3)'''
+        self.image = self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
+        cv2.imshow("window", self.image)
+        cv2.waitKey(3)
+        rospy.loginfo(img_lib.location1(self.image))
 
+    def PID_Controller(self,w):
+        prev_err = 0
+        integral = 0
+        dt = 1
+
+        cx = int(self.M['m10']/self.M['m00'])
+        cy = int(self.M['m01']/self.M['m00'])
+        cv2.circle(self.image, (cx, cy), 20, (0,0,255),-1)
+        err = cx - w/2
+        Kp = .006
+        Ki = 0
+        Kd = .002
+        integral = integral + err * dt
+        derivative = (err-prev_err) / dt
+        prev_err = err
+        output = (err * Kp) + (integral * Ki) + (derivative * Kd)
+        self.twist.linear.x = 0.3
+        self.twist.angular.z =  -output
+        self.cmd_vel_pub.publish(self.twist)'''
 
     
 
@@ -553,8 +491,7 @@ def main():
                                                         'Done' : 'DoneProgram'})
 
         smach.StateMachine.add('Turn90CounterClockwise', Turn90CounterClockwise(),
-                                        transitions = { 'Read': 'ReadShape',
-                                                        'Scan': 'ScanObject',
+                                        transitions = { 'Scan': 'ScanObject',
                                                         'Line': 'LineFollow',
                                                         'Done' : 'DoneProgram'})
 
@@ -565,16 +502,9 @@ def main():
         #                                transitions = {'Done' : 'DoneProgram'})
 
         smach.StateMachine.add('ScanObject', ScanObject(),
-                                        transitions = { 'Read': 'ReadShape',
-                                                        'TurnClock': 'Turn90Clockwise',
-                                                        'Done' : 'DoneProgram'})
-
-        smach.StateMachine.add('ReadShape', ReadShape(),
                                         transitions = { 'Turn180': 'Turn180',
                                                         'TurnClock': 'Turn90Clockwise',
                                                         'Done' : 'DoneProgram'})
-
-
  
  
     sis = smach_ros.IntrospectionServer('server_name', sm, '/SM_ROOT')

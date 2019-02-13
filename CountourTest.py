@@ -5,11 +5,13 @@ from imutils import contours
 from skimage import filters, morphology, measure
 from kobuki_msgs.msg import Led
 import imutils
+from shapedetector import ShapeDetector
+import argparse
 
 numpy.set_printoptions(threshold=numpy.nan)
 
 
-class CountourTest(smach.State):
+class Count(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['Done'])
         self.bridge = cv_bridge.CvBridge()
@@ -25,32 +27,27 @@ class CountourTest(smach.State):
         self.start = None
         self.end = None
         self.val = None
+        self.found = 0
+        self.lst = []
         
 
     def execute(self, userdata):
-    	self.led1.publish(0)
-        self.led2.publish(0)
-    	self.start = rospy.Time.now()
-        self.end = self.start + rospy.Duration(5)
         while not rospy.is_shutdown():
-        	if rospy.Time.now() >= self.end:
-    			self.val = self.avg
+        	if self.found:
+        		rospy.loginfo(self.val)
     			if self.val == 1:
     				rospy.loginfo('here1')
     				self.led1.publish(1)
     			elif self.val == 2:
     				rospy.loginfo('here2')
-    				self.led1.publish(1)
+    				self.led2.publish(1)
     			else:
     				rospy.loginfo('here3')
     				self.led1.publish(1)
     				self.led2.publish(1)
-    			rospy.loginfo(self.avg)
-    			#return 'Done'
-    		elif rospy.Time.now() < self.end:
-    			rospy.loginfo('counting')
-
-
+    		else:
+    			self.led1.publish(0)
+    			self.led2.publish(0)
 
         return 'Done'
 
@@ -60,6 +57,8 @@ class CountourTest(smach.State):
         #img_lib.location1(self.image)
         hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
 
+
+
     	#lower_red = numpy.array([120,30,100])#[100,0,0])                          # set upper and lower range for red mask
     	#upper_red = numpy.array([20,255,255])#[255,30,30])
     	#lower_red = numpy.array([20,0,0])#[100,0,0])                          # set upper and lower range for red mask
@@ -67,14 +66,23 @@ class CountourTest(smach.State):
     	#redmask = cv2.inRange(self.image,lower_red,upper_red)
     	#lower_red = numpy.array([100,100,100])
         #upper_red = numpy.array([255,255,255])
-        redmask = self.threshold_hsv_360(30,80,20,255,255,120,hsv)
+
+        # try h max at 10 to remove green
+        #redmask = self.threshold_hsv_360(30,80,20,255,255,120,hsv)  #ORIGINAL RED
+        #redmask = self.threshold_hsv_360(80,100,10,255,255,120,hsv)    # really good for red
+        #redmask = self.threshold_hsv_360(140,100,10,255,255,120,hsv)    # ignores green, really good for red
+        lower_red = numpy.array([40,50,50])#[100,0,0])                   
+    	upper_red = numpy.array([70,255,255])#[255,30,30])
+    	redmask = cv2.inRange(hsv,lower_red,upper_red) # green masks
         #cv2.inRange(hsv,lower_red,upper_red)
     	#rospy.loginfo(redmask)
     	ret, thresh = cv2.threshold(redmask, 127, 255, 0)
     	im2, cnts, hierarchy = cv2.findContours(thresh,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     	cv2.drawContours(redmask, cnts, -1, (0,255,0), 3)
-    	
 
+    	sd = ShapeDetector()
+    	shape = sd.detect(cnts)
+    	rospy.loginfo(shape)
     	#redmask2 = redmask + 1
     	#img = numpy.zeros((480,640))
     	#if self.first:
@@ -88,14 +96,12 @@ class CountourTest(smach.State):
     	img += 1
     	propsa = measure.regionprops(img.astype(int))
     	length = len(propsa)
-    	self.grouping += length - 1
-    	self.i += 1
-    	self.avg = self.grouping/self.i
-    	rospy.loginfo(self.avg)
+    	self.lst.append(length-1)
 
-
-
-
+    	if len(self.lst) > 40:
+    		self.val = self.lst[-1]
+    		self.found = 1
+    	#rospy.loginfo(self.avg)
     	#imgray = cv2.cvtColor(redmask, cv2.COLOR_BGR2GRAY)
     	#rospy.loginfo(imgray)
     	
@@ -125,12 +131,12 @@ def main():
     rospy.init_node('Test')
     rate = rospy.Rate(10)
     sm = smach.StateMachine(outcomes = ['DoneProgram'])
-    sm.set_initial_state(['CountourTest'])
+    sm.set_initial_state(['Count'])
 
     with sm:
         
 
-        smach.StateMachine.add('CountourTest', CountourTest(),
+        smach.StateMachine.add('Count', Count(),
                                         transitions = {'Done' : 'DoneProgram'})
 
  
