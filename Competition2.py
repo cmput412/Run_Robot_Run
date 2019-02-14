@@ -9,7 +9,7 @@ from skimage import filters, morphology, measure
 from shapedetector import ShapeDetector
 
 numpy.set_printoptions(threshold=numpy.nan)
-counter = 6
+counter = 0
 gshape = "square"
 
 class SleepState(smach.State):
@@ -225,8 +225,8 @@ class Turn90Clockwise(smach.State):
         self.angle = 90
         self.angular_speed = self.speed*2*math.pi/360
         self.relative_angle = self.angle*2.3*math.pi/360
-        self.mult = 1.2
-        self.nult2 = 0.8
+        self.mult = 1
+        self.mult2 = 0.8
 
     def button_callback(self,msg):
         rospy.loginfo('in callback')
@@ -297,7 +297,7 @@ class Turn90CounterClockwise(smach.State):
         self.angle = 90
         self.angular_speed = self.speed*2*math.pi/360
         self.relative_angle = self.angle*2.3*math.pi/360
-        self.mult = 1.2
+        self.mult = 1
         self.mult2 = 0.8
 
 
@@ -548,9 +548,9 @@ class ReadShape(smach.State):
             for c in cnts:
                 shape = sd.detect(c)
      
-            #shape = sd.detect(cnts)
-            if shape != None:
-                self.shape_list.append(shape)
+                #shape = sd.detect(cnts)
+                if shape != None:
+                    self.shape_list.append(shape)
                 
                 #gshape = shape
                 #self.found = 1

@@ -85,9 +85,9 @@ class Count(smach.State):
     	shape = None
     	for c in cnts:
 			shape = sd.detect(c)
- 
+ 			rospy.loginfo(shape)
     	#shape = sd.detect(cnts)
-    	rospy.loginfo(shape)
+    	
     	#redmask2 = redmask + 1
     	#img = numpy.zeros((480,640))
     	#if self.first:
