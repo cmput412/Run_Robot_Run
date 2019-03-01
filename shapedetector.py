@@ -19,7 +19,6 @@ class ShapeDetector:
 			# a rectangle
 			elif len(approx) == 4:
 				# compute the bounding box of the contour and use the
-			
 				# a square will have an aspect ratio that is approximately
 				# equal to one, otherwise, the shape is a rectangle
 				shape = "square"
