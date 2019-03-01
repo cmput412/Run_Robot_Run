@@ -4,7 +4,7 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan, Joy, Image
 from nav_msgs.msg import Odometry
 from kobuki_msgs.msg import Led, BumperEvent, Sound
-import imutils
+
 from skimage import filters, morphology, measure
 from shapedetector import ShapeDetector
 
